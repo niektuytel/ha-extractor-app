@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.6] - 2026-10-05
+
+### Fixed
+- Pointed the add-on image and repository metadata to the NiekTuytel repository so Supervisor pulls the published image from the correct owner.
+
 ## [0.0.5] - 2026-10-05
 
 ### Changed

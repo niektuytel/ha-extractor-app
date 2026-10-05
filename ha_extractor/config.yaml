@@ -1,9 +1,9 @@
-name: "HA Dashboard Extractor (MelchMwoan)"
-description: "MelchMwoan's dashboard pre-renderer: animated WebP or MP4 videos, optimized for slow tablets."
-version: "0.0.5"
+name: "HA Dashboard Extractor (Niek Tuytel)"
+description: "Niek Tuytel's dashboard pre-renderer: animated WebP or MP4 videos, optimized for slow tablets."
+version: "0.0.6"
 slug: "ha_extractor"
-url: "https://github.com/MelchMwoan/ha-extractor-app"
-image: "ghcr.io/melchmwoan/ha-extractor-app"
+url: "https://github.com/niektuytel/ha-extractor-app"
+image: "ghcr.io/niektuytel/ha-extractor-app"
 init: false
 arch:
   - amd64

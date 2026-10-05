@@ -17,7 +17,7 @@ FROM ${BUILD_FROM}
 LABEL \
   org.opencontainers.image.title="Home Assistant App: HA Extractor" \
   org.opencontainers.image.description="Pre-renders Home Assistant dashboards as animated WebP or MP4 files." \
-  org.opencontainers.image.source="https://github.com/MelchMwoan/ha-extractor-app" \
+  org.opencontainers.image.source="https://github.com/niektuytel/ha-extractor-app" \
   org.opencontainers.image.licenses="MIT"
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
