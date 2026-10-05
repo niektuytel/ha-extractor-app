@@ -35,15 +35,33 @@ jobs:
 
       - name: Normalize app information
         id: normalize
+        env:
+          APP_IMAGE: ${{ steps.info.outputs.image }}
+          APP_VERSION: ${{ steps.info.outputs.version }}
+          APP_NAME: ${{ steps.info.outputs.name }}
+          APP_DESCRIPTION: ${{ steps.info.outputs.description }}
+          APP_URL: ${{ steps.info.outputs.url }}
         shell: bash
         run: |
-          image="${{ steps.info.outputs.image }}"
+          strip_yaml_quotes() {
+            local value="$1"
+            if [[ "$value" == \"*\" ]]; then
+              value="${value#\"}"
+              value="${value%\"}"
+            fi
+            printf '%s' "$value"
+          }
+
+          image="$(strip_yaml_quotes "$APP_IMAGE")"
+          version="$(strip_yaml_quotes "$APP_VERSION")"
+          name="$(strip_yaml_quotes "$APP_NAME")"
+          description="$(strip_yaml_quotes "$APP_DESCRIPTION")"
+          url="$(strip_yaml_quotes "$APP_URL")"
           echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
-          echo "version=${{ steps.info.outputs.version }}" >> "$GITHUB_OUTPUT"
-          echo "name=${{ steps.info.outputs.name }}" >> "$GITHUB_OUTPUT"
-          echo "description=${{ steps.info.outputs.description }}" >> "$GITHUB_OUTPUT"
-          url="${{ steps.info.outputs.url }}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "description=$description" >> "$GITHUB_OUTPUT"
           if [[ -n "$url" && "$url" != "null" ]]; then
             echo "url=$url" >> "$GITHUB_OUTPUT"
           fi
