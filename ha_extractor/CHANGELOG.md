@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.0.5] - 2026-10-05
+
+### Changed
+- Added the maintainer name to the add-on title and description so it is easy to identify in Home Assistant.
+
 ## [0.0.4] - 2026-09-28
 
 ### Added
