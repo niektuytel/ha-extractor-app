@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.7] - 2026-10-09
+
+### Added
+- Added a `pages` list (or standalone `PAGES` JSON environment variable) to record multiple dashboards on the shared schedule.
+- Generate a separate named HTML player, recording, and version file for each configured page.
+- Retain a separate browser tab for each page when profile retention is enabled, and continue recording other pages after a failure.
+
+### Changed
+- Preserve the existing single-dashboard output and `index.html` when the pages list is empty.
+
 ## [0.0.6] - 2026-10-05
 
 ### Fixed

@@ -1,7 +1,17 @@
 configuration:
   url:
     name: URL
-    description: URL van het Home Assistant dashboard om vast te leggen. Het is aangeraden om de kiosk versie te gebruiken.
+    description: Dashboard-URL die wordt gebruikt als de paginalijst leeg is. Gebruik indien mogelijk de kioskversie.
+  pages:
+    name: Pagina's
+    description: Dashboards die na elkaar worden opgenomen. Elke pagina krijgt een eigen HTML-speler en opname. Laat leeg om de enkele dashboard-URL te gebruiken.
+    fields:
+      name:
+        name: Paginanaam
+        description: Unieke bestandsnaam met kleine letters, cijfers, streepjes of underscores, beginnend met een letter of cijfer.
+      url:
+        name: Dashboard-URL
+        description: Volledige URL van het Home Assistant dashboard om op te nemen.
   token:
     name: Token
     description: Toegangstoken voor Home Assistant (optioneel). Als het niet wordt geleverd, zal de app proberen de token van de add-on te gebruiken.
@@ -49,4 +59,4 @@ configuration:
     description: Maximum aantal FFmpeg-threads. Eén thread verlaagt het CPU-gebruik; hogere waarden coderen sneller.
   output_path:
     name: Output Pad
-    description: Pad waar het output bestand opgeslagen wordt.
+    description: Bestandsnaam voor de uitvoer zonder extensie. Bij meerdere pagina's wordt de map gebruikt en komen de bestandsnamen van de paginanamen.

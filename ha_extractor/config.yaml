@@ -1,6 +1,6 @@
 name: "HA Dashboard Extractor (Niek Tuytel)"
 description: "Niek Tuytel's dashboard pre-renderer: animated WebP or MP4 videos, optimized for slow tablets."
-version: "0.0.6"
+version: "0.0.7"
 slug: "ha_extractor"
 url: "https://github.com/niektuytel/ha-extractor-app"
 image: "ghcr.io/niektuytel/ha-extractor-app"
@@ -14,6 +14,7 @@ map:
     path: /config
 options:
   url: "http://homeassistant:8123/lovelace?kiosk"
+  pages: []
   token: ""
   width: 360
   height: 640
@@ -32,6 +33,9 @@ options:
   output_path: "/config/www/ha-extractor/output"
 schema:
   url: str
+  pages:
+    - name: "match(^[a-z0-9][a-z0-9_-]*$)"
+      url: url
   token: str?
   width: int
   height: int

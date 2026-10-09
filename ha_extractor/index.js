@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { buildCapturePages } from './pages.js';
 
 dotenv.config();
 
@@ -93,7 +94,7 @@ const mp4Presets = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'med
 if (!mp4Presets.includes(config.mp4Preset)) throw new Error(`mp4_preset must be one of ${mp4Presets.join(', ')}, got "${config.mp4Preset}"`);
 if (config.screencastQuality > 100) throw new Error(`screencast_quality must be between 1 and 100, got ${config.screencastQuality}`);
 if (!cron.validate(config.cronSchedule)) throw new Error(`Invalid cron schedule: ${config.cronSchedule}`);
-try { new URL(config.url); } catch { throw new Error(`Invalid HA_URL: ${config.url}`); }
+const capturePages = buildCapturePages(value('pages', 'PAGES', []), config);
 
 const tempDir = path.resolve(process.env.TEMP_VIDEO_DIR || './temp_videos');
 const playerTemplate = fs.readFileSync(new URL('./player.html', import.meta.url), 'utf8');
@@ -106,13 +107,11 @@ let stopping = false;
 let scheduledTask;
 let sharedBrowser;
 let sharedPersistentContext;
-let sharedPersistentPage;
-let retainedPageReady = false;
+const retainedPages = new Map();
 let profileCacheLastClearedAt = 0;
 const profileDir = path.resolve(process.env.CHROMIUM_PROFILE_DIR || '/data/chromium-profile');
 
-async function ensurePlayerPage(finalOutputPath) {
-  const playerPath = path.join(path.dirname(finalOutputPath), 'index.html');
+async function ensurePlayerPage(finalOutputPath, playerPath) {
   const sourceName = path.basename(finalOutputPath);
   const versionName = `${sourceName}.version`;
   const playerHtml = playerTemplate
@@ -154,20 +153,21 @@ async function closeSharedBrowser() {
 
   const persistentContext = sharedPersistentContext;
   sharedPersistentContext = undefined;
-  sharedPersistentPage = undefined;
-  retainedPageReady = false;
+  retainedPages.clear();
   if (persistentContext) await persistentContext.close().catch((error) => log.warn(`Could not close retained profile cleanly: ${error.message}`));
 }
 
 async function addAuthScript(context) {
   if (!config.token) return;
-  const hassUrl = new URL(config.url).origin;
-  await context.addInitScript(({ token, hassUrl: origin }) => {
+  const origins = [...new Set(capturePages.map((page) => new URL(page.url).origin))];
+  await context.addInitScript(({ token, origins: allowedOrigins }) => {
+    const origin = window.location.origin;
+    if (!allowedOrigins.includes(origin)) return;
     window.localStorage.setItem('hassTokens', JSON.stringify({
       access_token: token, expires_in: 315360000, refresh_token: '', token_type: 'Bearer',
       clientId: origin, hassUrl: origin,
     }));
-  }, { token: config.token, hassUrl });
+  }, { token: config.token, origins });
 }
 
 async function getCaptureContext() {
@@ -206,21 +206,22 @@ async function clearProfileCacheIfDue(context, page) {
   log.info('Cleared retained Chromium HTTP cache');
 }
 
-async function getRetainedPage(context) {
-  if (sharedPersistentPage && !sharedPersistentPage.isClosed()) return sharedPersistentPage;
-  sharedPersistentPage = await context.newPage();
-  retainedPageReady = false;
-  return sharedPersistentPage;
+async function getRetainedPage(context, dashboard) {
+  const retained = retainedPages.get(dashboard.name);
+  if (retained && !retained.page.isClosed()) return retained.page;
+  const page = await context.newPage();
+  retainedPages.set(dashboard.name, { page, ready: false });
+  return page;
 }
 
-async function preparePage(page) {
-  if (config.retainProfile && retainedPageReady && page.url() === config.url) {
-    log.info('Reusing the retained Home Assistant page; navigation skipped');
+async function preparePage(page, dashboard) {
+  if (config.retainProfile && retainedPages.get(dashboard.name)?.ready && page.url() === dashboard.url) {
+    log.info(`Reusing retained page "${dashboard.name}"; navigation skipped`);
     return;
   }
 
-  log.info(`Navigating to ${config.url}`);
-  await page.goto(config.url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  log.info(`Navigating to ${dashboard.url}`);
+  await page.goto(dashboard.url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   if (config.waitUntilLoaded) {
     log.info('Waiting for Home Assistant data');
     await page.waitForFunction(() => {
@@ -238,7 +239,7 @@ async function preparePage(page) {
   }
 
   await page.evaluate((zoom) => { document.body.style.zoom = String(zoom); }, config.zoom);
-  if (config.retainProfile) retainedPageReady = true;
+  if (config.retainProfile) retainedPages.get(dashboard.name).ready = true;
 }
 
 async function captureVideo(page, captureId) {
@@ -263,26 +264,37 @@ async function captureDashboard() {
   }
 
   captureRunning = true;
+  try {
+    for (const dashboard of capturePages) {
+      if (stopping) break;
+      await capturePage(dashboard);
+    }
+  } finally {
+    captureRunning = false;
+  }
+}
+
+async function capturePage(dashboard) {
   const captureId = ++captureSequence;
   let context;
   let page;
   let captureSource;
   const extension = config.outputType === 'mp4' ? '.mp4' : '.webp';
-  const finalOutputPath = `${config.outputPathBase}${extension}`;
+  const finalOutputPath = `${dashboard.outputPathBase}${extension}`;
 
   try {
     await fsp.mkdir(path.dirname(finalOutputPath), { recursive: true });
     await fsp.mkdir(tempDir, { recursive: true });
-    await ensurePlayerPage(finalOutputPath);
-    log.info(`Starting capture #${captureId}`);
+    await ensurePlayerPage(finalOutputPath, dashboard.playerPath);
+    log.info(`Starting capture #${captureId} for page "${dashboard.name}"`);
 
     context = await getCaptureContext();
 
     page = config.retainProfile
-      ? await getRetainedPage(context)
+      ? await getRetainedPage(context, dashboard)
       : await context.newPage();
     await clearProfileCacheIfDue(context, page);
-    await preparePage(page);
+    await preparePage(page, dashboard);
     log.info(`Recording capture #${captureId} for ${config.durationMs / 1000} seconds`);
     captureSource = await captureVideo(page, captureId);
     if (!config.retainProfile) {
@@ -296,17 +308,15 @@ async function captureDashboard() {
     captureSource = undefined;
     enqueueEncoding(completedCapture, finalOutputPath, extension, captureId);
   } catch (error) {
-    log.err(`Capture #${captureId} failed: ${error.message}`);
+    log.err(`Capture #${captureId} for page "${dashboard.name}" failed: ${error.message}`);
     if (config.retainProfile) {
-      sharedPersistentPage = undefined;
-      retainedPageReady = false;
+      retainedPages.delete(dashboard.name);
       await page?.close().catch(() => { });
     }
   } finally {
     if (page && !config.retainProfile && !page.isClosed()) await page.close().catch(() => { });
     if (context && context !== sharedPersistentContext) await context.close().catch(() => { });
     if (captureSource) await removeCaptureSource(captureSource);
-    captureRunning = false;
   }
 }
 
@@ -369,7 +379,10 @@ process.once('SIGINT', () => void shutdown('SIGINT'));
 
 log.info('HA Extractor started');
 log.info(`Settings: ${config.width}x${config.height}, zoom=${config.zoom}, screencastQuality=${config.screencastQuality}, duration=${config.durationMs / 1000}s, waitUntilLoaded=${config.waitUntilLoaded}, delayAfterLoaded=${config.delayAfterLoadedMs / 1000}s, retainProfile=${config.retainProfile}, profileCacheClearInterval=${config.profileCacheClearIntervalMs / 60000}m, ${config.framerate}fps ${config.outputType}, mp4Preset=${config.mp4Preset}, encoderThreads=${config.encoderThreads}`);
-log.info(`Settings: url=${config.url}, output=${config.outputPathBase}${config.outputType === 'mp4' ? '.mp4' : '.webp'}, schedule=${config.cronSchedule}`);
+log.info(`Settings: pages=${capturePages.length}, schedule=${config.cronSchedule}`);
+for (const dashboard of capturePages) {
+  log.info(`Page "${dashboard.name}": url=${dashboard.url}, output=${dashboard.outputPathBase}.${config.outputType}, player=${dashboard.playerPath}`);
+}
 
 void captureDashboard();
 scheduledTask = cron.schedule(config.cronSchedule, () => void captureDashboard());

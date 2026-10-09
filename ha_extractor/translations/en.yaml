@@ -1,7 +1,17 @@
 configuration:
   url:
     name: URL
-    description: URL of the Home Assistant Lovelace dashboard to capture. Use the kiosk version if available.
+    description: Dashboard URL used when the pages list is empty. Use the kiosk version if available.
+  pages:
+    name: Pages
+    description: Dashboards to record in sequence. Each entry generates its own HTML player and recording. Leave empty to use the single dashboard URL.
+    fields:
+      name:
+        name: Page name
+        description: Unique filename using lowercase letters, numbers, hyphens or underscores, starting with a letter or number.
+      url:
+        name: Dashboard URL
+        description: Full URL of the Home Assistant dashboard to record.
   token:
     name: Token
     description: Access token for Home Assistant (optional). If not provided, the app will try to use the add-on's token.
@@ -49,4 +59,4 @@ configuration:
     description: Maximum number of FFmpeg encoder threads. One reduces CPU usage; higher values encode faster.
   output_path:
     name: Output Path
-    description: Path to the output file.
+    description: Output filename without an extension. When pages are configured, its directory is used and filenames come from page names.

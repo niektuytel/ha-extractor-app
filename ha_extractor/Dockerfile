@@ -37,7 +37,7 @@ COPY --from=builder /build/node_modules ./node_modules
 COPY --from=builder /build/package.json ./package.json
 COPY --from=builder /ms-playwright /ms-playwright
 
-COPY index.js player.html ./
+COPY index.js pages.js player.html ./
 COPY rootfs /
 RUN chmod +x /etc/services.d/ha-extractor/run \
   && mkdir -p /config/www/ha-extractor
